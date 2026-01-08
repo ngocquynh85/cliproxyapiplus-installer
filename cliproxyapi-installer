@@ -587,6 +587,11 @@ EOF
     log_info "  systemctl --user status cliproxyapi.service"
 }
 
+find_extracted_binary() {
+    local version_dir="$1"
+    find "$version_dir" -type f \( -name "cli-proxy-api" -o -name "CLIProxyAPI" \) -print | head -1
+}
+
 # Copy example config if no existing config and setup main directory structure
 setup_config() {
     local version_dir="$1"
@@ -596,12 +601,16 @@ setup_config() {
     
     local config="${INSTALL_DIR}/config.yaml"
     local example_config="${version_dir}/config.example.yaml"
-    local executable="${version_dir}/cli-proxy-api"
+    local executable
+    executable=$(find_extracted_binary "$version_dir")
     
-    # Copy executable to main directory
-    if [[ -f "$executable" ]]; then
-        cp "$executable" "${INSTALL_DIR}/cli-proxy-api"
-        log_success "Copied executable to ${INSTALL_DIR}/cli-proxy-api"
+    if [[ -n "$executable" && -f "$executable" ]]; then
+        chmod +x "$executable"
+        ln -sfn "$(realpath "$executable")" "${INSTALL_DIR}/cli-proxy-api"
+        log_success "Linked executable to ${INSTALL_DIR}/cli-proxy-api -> $executable"
+    else
+        log_error "Could not find extracted binary in $version_dir"
+        exit 1
     fi
     
     # PRIORITY 1: If we have a backup from this upgrade, restore it
@@ -721,7 +730,8 @@ make_executable() {
     local version_dir="$1"
 
     local binary
-    binary=$(find "$version_dir" -name "CLIProxyAPI" -o -name "cli-proxy-api" -type f | head -1)
+    #binary=$(find "$version_dir" -name "CLIProxyAPI" -o -name "cli-proxy-api" -type f | head -1)
+    binary=$(find "$version_dir" -type f \( -name "cli-proxy-api" -o -name "CLIProxyAPI" \) | head -1)    
     if [[ -n "$binary" ]]; then
         chmod +x "$binary"
         log_success "Made CLIProxyAPI binary executable"
