@@ -601,17 +601,26 @@ setup_config() {
     
     local config="${INSTALL_DIR}/config.yaml"
     local example_config="${version_dir}/config.example.yaml"
+    # Find extracted binary in the version directory (Plus uses cli-proxy-api-plus)
     local executable
-    executable=$(find_extracted_binary "$version_dir")
+    executable=$(find "$version_dir" -type f \( \
+        -name "cli-proxy-api-plus" \
+        -o -name "cli-proxy-api" \
+        -o -name "CLIProxyAPI" \
+    \) | head -1)
     
-    if [[ -n "$executable" && -f "$executable" ]]; then
-        chmod +x "$executable"
-        ln -sfn "$(realpath "$executable")" "${INSTALL_DIR}/cli-proxy-api"
-        log_success "Linked executable to ${INSTALL_DIR}/cli-proxy-api -> $executable"
-    else
+    if [[ -z "$executable" ]]; then
         log_error "Could not find extracted binary in $version_dir"
+        log_error "Files in $version_dir:"
+        find "$version_dir" -maxdepth 2 -type f -print
         exit 1
     fi
+    
+    chmod +x "$executable"
+    
+    # Promote binary to stable path used by systemd: ~/cliproxyapi/cli-proxy-api
+    ln -sfn "$(realpath "$executable")" "${INSTALL_DIR}/cli-proxy-api"
+    log_success "Linked executable: ${INSTALL_DIR}/cli-proxy-api -> $(basename "$executable")"
     
     # PRIORITY 1: If we have a backup from this upgrade, restore it
     if [[ -n "$backup_file" && -f "$backup_file" ]]; then
@@ -730,8 +739,11 @@ make_executable() {
     local version_dir="$1"
 
     local binary
-    #binary=$(find "$version_dir" -name "CLIProxyAPI" -o -name "cli-proxy-api" -type f | head -1)
-    binary=$(find "$version_dir" -type f \( -name "cli-proxy-api" -o -name "CLIProxyAPI" \) | head -1)    
+    binary=$(find "$version_dir" -type f \( \
+        -name "cli-proxy-api-plus" \
+        -o -name "cli-proxy-api" \
+        -o -name "CLIProxyAPI" \
+    \) | head -1)
     if [[ -n "$binary" ]]; then
         chmod +x "$binary"
         log_success "Made CLIProxyAPI binary executable"
